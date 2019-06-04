@@ -1,8 +1,8 @@
 [package]
-name = "vtable"
+name = "vptr"
 version = "0.1.0"
 authors = ["Olivier Goffart <ogoffart@woboq.com>"]
 edition = "2018"
 
 [dependencies]
-memoffset = "0.3"
+vptr-macros = {path = "./macros", version = "=0.1.0"}

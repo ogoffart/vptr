@@ -1,0 +1,15 @@
+[package]
+name = "vptr-macros"
+version = "0.1.0"
+authors = ["Olivier Goffart <ogoffart@woboq.com>"]
+description = "Procedural macros for vptr"
+edition = "2018"
+
+[lib]
+path = "macros.rs"
+proc-macro = true
+
+[dependencies]
+quote = "0.6.12"
+syn = {version = "0.15.34", features = ["full", "extra-traits"]}
+
