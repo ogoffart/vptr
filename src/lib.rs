@@ -110,7 +110,11 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![warn(missing_docs)]
 pub use ::vptr_macros::vptr;
+use core::borrow::{Borrow, BorrowMut};
 use core::marker::PhantomData;
+use core::ops::{Deref, DerefMut};
+#[cfg(feature = "std")]
+use std::boxed::Box;
 
 /// Represent a pointer to a virtual table to the trait `Trait` that is to be embedded in
 /// a structure `T`
@@ -177,12 +181,25 @@ pub unsafe trait HasVPtr<Trait: ?Sized> {
     where
         Self: Sized;
 
+    /// return the a reference of the VPtr within Self
+    fn get_vptr_mut(&mut self) -> &mut VPtr<Self, Trait>
+    where
+        Self: Sized;
+
     /// return a light reference to self
     fn as_light_ref(&self) -> LightRef<Trait>
     where
         Self: Sized,
     {
         unsafe { LightRef::new(self.get_vptr()) }
+    }
+
+    /// return a light reference to self
+    fn as_light_ref_mut(&mut self) -> LightRefMut<Trait>
+    where
+        Self: Sized,
+    {
+        unsafe { LightRefMut::new(self.get_vptr_mut()) }
     }
 }
 
@@ -205,7 +222,7 @@ impl<'a, Trait: ?Sized> LightRef<'a, Trait> {
     }
 }
 
-impl<'a, Trait: ?Sized + 'a> ::core::ops::Deref for LightRef<'a, Trait> {
+impl<'a, Trait: ?Sized + 'a> Deref for LightRef<'a, Trait> {
     type Target = Trait;
 
     fn deref(&self) -> &Self::Target {
@@ -220,7 +237,7 @@ impl<'a, Trait: ?Sized + 'a> ::core::ops::Deref for LightRef<'a, Trait> {
     }
 }
 
-impl<'a, Trait: ?Sized + 'a> ::core::borrow::Borrow<Trait> for LightRef<'a, Trait> {
+impl<'a, Trait: ?Sized + 'a> Borrow<Trait> for LightRef<'a, Trait> {
     fn borrow(&self) -> &Trait {
         &**self
     }
@@ -229,6 +246,137 @@ impl<'a, Trait: ?Sized + 'a> ::core::borrow::Borrow<Trait> for LightRef<'a, Trai
 impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a T> for LightRef<'a, Trait> {
     fn from(f: &'a T) -> Self {
         unsafe { LightRef::new(f.get_vptr()) }
+    }
+}
+
+/// A light reference (size = `size_of::<usize>()`) to an object implementing the trait `Trait`
+#[derive(Eq, PartialEq)]
+pub struct LightRefMut<'a, Trait: ?Sized> {
+    ptr: &'a mut &'static VTableData,
+    phantom: PhantomData<&'a mut Trait>,
+}
+
+impl<'a, Trait: ?Sized> LightRefMut<'a, Trait> {
+    /// Create a new reference from a reference to a VPtr
+    ///
+    /// Safety: the ptr must be a field of a reference to T
+    unsafe fn new<T: HasVPtr<Trait>>(ptr: &'a mut VPtr<T, Trait>) -> Self {
+        LightRefMut {
+            ptr: &mut ptr.vtable,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<'a, Trait: ?Sized + 'a> Deref for LightRefMut<'a, Trait> {
+    type Target = Trait;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe {
+            let VTableData { offset, vtable } = **self.ptr;
+            let p = (self.ptr as *const _ as *const u8).offset(-offset) as *const ();
+            internal::TransmuterTO::<Trait> {
+                to: internal::TraitObject { data: p, vtable },
+            }
+            .ptr
+        }
+    }
+}
+
+impl<'a, Trait: ?Sized + 'a> DerefMut for LightRefMut<'a, Trait> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe {
+            // ### check: is that a valid way?
+            core::mem::transmute(Deref::deref(self) as *const Trait)
+        }
+    }
+}
+
+impl<'a, Trait: ?Sized + 'a> Borrow<Trait> for LightRefMut<'a, Trait> {
+    fn borrow(&self) -> &Trait {
+        &**self
+    }
+}
+
+impl<'a, Trait: ?Sized + 'a> BorrowMut<Trait> for LightRefMut<'a, Trait> {
+    fn borrow_mut(&mut self) -> &mut Trait {
+        &mut **self
+    }
+}
+
+impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a mut T> for LightRefMut<'a, Trait> {
+    fn from(f: &'a mut T) -> Self {
+        unsafe { LightRefMut::new(f.get_vptr_mut()) }
+    }
+}
+
+/// A Box of a trait with a size of `size_of::<usize>`
+///
+/// The LightBox can be created from a Box which implement the HasVPtr<Trait>
+///
+///
+/// ```rust
+/// # use vptr::*;
+/// trait Shape { fn area(&self) -> f32; }
+/// #[vptr(Shape)]
+/// #[derive(Default)]
+/// struct Rectangle { w: f32, h : f32 }
+/// impl Shape for Rectangle { fn area(&self) -> f32 { self.w * self.h } }
+///
+/// let r = Box::new(Rectangle { w: 5., h: 10., ..Default::default() });
+/// let light = LightBox::from_box(r);
+/// assert_eq!(light.area(), 50.);
+/// ```
+#[cfg(feature = "std")]
+pub struct LightBox<Trait : ?Sized + 'static>(*mut &'static VTableData, PhantomData<*mut Trait>);
+
+#[cfg(feature = "std")]
+impl<Trait: ?Sized + 'static> LightBox<Trait> {
+    /// Creates a LightBox from a Box
+    pub fn from_box<T : HasVPtr<Trait>>(f : Box<T>) -> Self {
+        LightBox((&mut Box::leak(f).get_vptr_mut().vtable) as *mut &'static VTableData, PhantomData)
+    }
+    /// Conver the LightBox into a Box
+    pub fn into_box(mut b : LightBox<Trait>) -> Box<Trait> {
+        let ptr = (&mut *LightBox::as_light_ref_mut(&mut b)) as *mut Trait;
+        core::mem::forget(b);
+        unsafe { Box::from_raw(ptr) }
+    }
+
+    /// As a LightRef
+    pub fn as_light_ref(b: &LightBox<Trait>) -> LightRef<Trait> {
+        LightRef { ptr: unsafe { (& *b.0) as & &'static VTableData} , phantom: PhantomData }
+    }
+
+    /// As a LightRefMut
+    pub fn as_light_ref_mut(b: &mut LightBox<Trait>) -> LightRefMut<Trait> {
+        LightRefMut { ptr: unsafe { (&mut *b.0) as &mut &'static VTableData} , phantom: PhantomData }
+    }
+}
+
+#[cfg(feature = "std")]
+impl<Trait: ?Sized + 'static> Drop for LightBox<Trait> {
+    fn drop(&mut self) {
+        let ptr = &mut *LightBox::as_light_ref_mut(self) as *mut Trait;
+        unsafe { Box::from_raw(ptr) };
+    }
+}
+
+#[cfg(feature = "std")]
+impl<Trait: ?Sized + 'static> Deref for LightBox<Trait> {
+    type Target = Trait;
+
+    fn deref(&self) -> &Self::Target {
+        let ptr = &*LightBox::as_light_ref(self) as *const Trait;
+        unsafe { &*ptr }
+    }
+}
+
+#[cfg(feature = "std")]
+impl<Trait: ?Sized + 'static> DerefMut for LightBox<Trait> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        let ptr = &mut *LightBox::as_light_ref_mut(self) as *mut Trait;
+        unsafe { &mut *ptr }
     }
 }
 
@@ -328,8 +476,15 @@ mod tests {
         println!("{:?}", f);
         assert_eq!(f.myfn(), 9);
 
-        let xx: LightRef<MyTrait> = f.as_light_ref();
-        assert_eq!(xx.myfn(), 9);
+        {
+            let xx: LightRef<MyTrait> = f.as_light_ref();
+            assert_eq!(xx.myfn(), 9);
+        }
+
+        {
+            let xx: LightRefMut<MyTrait> = f.as_light_ref_mut();
+            assert_eq!(xx.myfn(), 9);
+        }
     }
 
     /*

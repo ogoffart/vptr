@@ -114,6 +114,7 @@ fn vptr_impl(attr: AttributeArgs, item: ItemStruct) -> Result<TokenStream, syn::
                 }
 
                 fn get_vptr(&self) -> &VPtr<Self, #trait_> { &self.#field_name }
+                fn get_vptr_mut(&mut self) -> &mut VPtr<Self, #trait_> { &mut self.#field_name }
             }
         );
     }
