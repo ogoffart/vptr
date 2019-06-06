@@ -117,20 +117,32 @@ use std::marker::PhantomData;
 /// One should not need to use this structure directly, it is going to be created by the `vptr`
 /// procedural macro.
 #[derive(Clone, Copy, Eq, Hash, PartialEq, PartialOrd)]
-pub struct VPtr<T, Trait : ?Sized> where T : HasVPtr<Trait> {
-    vtable : &'static VTableData,
-    phantom : PhantomData<(*const T, *const Trait)>
+pub struct VPtr<T, Trait: ?Sized>
+where
+    T: HasVPtr<Trait>,
+{
+    vtable: &'static VTableData,
+    phantom: PhantomData<(*const T, *const Trait)>,
 }
 
-impl<T, Trait : ?Sized> VPtr<T, Trait> where T: HasVPtr<Trait> {
+impl<T, Trait: ?Sized> VPtr<T, Trait>
+where
+    T: HasVPtr<Trait>,
+{
     // Creates a new VPtr initialized to a pointer of the vtable of the `Trait` for the type `T`.
     // Same as VPtr::default()
     pub fn new() -> Self {
-        VPtr{vtable : T::init(),  phantom: PhantomData }
+        VPtr {
+            vtable: T::init(),
+            phantom: PhantomData,
+        }
     }
 }
 
-impl<T, Trait : ?Sized> Default for VPtr<T, Trait> where T: HasVPtr<Trait> {
+impl<T, Trait: ?Sized> Default for VPtr<T, Trait>
+where
+    T: HasVPtr<Trait>,
+{
     // Creates a new VPtr initialized to a pointer of the vtable of the `Trait` for the type `T`.
     // Same as VPtr::new()
     fn default() -> Self {
@@ -138,7 +150,10 @@ impl<T, Trait : ?Sized> Default for VPtr<T, Trait> where T: HasVPtr<Trait> {
     }
 }
 
-impl<T, Trait : ?Sized> std::fmt::Debug for VPtr<T, Trait> where T: HasVPtr<Trait> {
+impl<T, Trait: ?Sized> std::fmt::Debug for VPtr<T, Trait>
+where
+    T: HasVPtr<Trait>,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.pad("VPtr")
     }
@@ -147,49 +162,61 @@ impl<T, Trait : ?Sized> std::fmt::Debug for VPtr<T, Trait> where T: HasVPtr<Trai
 /// This trait indicate that the type has a VPtr field to the trait `Trait`
 ///
 /// You should not implement this trait yourself, it is implemented by the `vptr` macro
-pub unsafe trait HasVPtr<Trait : ?Sized> {
+pub unsafe trait HasVPtr<Trait: ?Sized> {
     /// Initialize a VTableData suitable to initialize the VPtr within Self
     fn init() -> &'static VTableData;
 
     /// return the a reference of the VPtr within Self
-    fn get_vptr(&self) -> &VPtr<Self, Trait> where Self: Sized;
+    fn get_vptr(&self) -> &VPtr<Self, Trait>
+    where
+        Self: Sized;
 
-    fn as_light_ref(&self) -> LightRef<Trait> where Self: Sized { LightRef::new(self.get_vptr()) }
-}
-
-
-/// A light reference (size = `size_of(usize)`) to an object implementing the trait `Trait`
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub struct LightRef<'a, Trait : ?Sized> {
-    ptr : &'a &'static VTableData,
-    phantom : PhantomData<&'a Trait>
-}
-
-impl<'a, Trait : ?Sized> LightRef<'a, Trait> {
-    pub fn new<T: HasVPtr<Trait>>(ptr : &'a VPtr<T, Trait>) -> Self {
-        LightRef{ ptr: &ptr.vtable, phantom: PhantomData }
+    fn as_light_ref(&self) -> LightRef<Trait>
+    where
+        Self: Sized,
+    {
+        LightRef::new(self.get_vptr())
     }
 }
 
-impl<'a, Trait : ?Sized + 'a> ::core::ops::Deref for LightRef<'a, Trait> {
-    type Target = Trait;
+/// A light reference (size = `size_of(usize)`) to an object implementing the trait `Trait`
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub struct LightRef<'a, Trait: ?Sized> {
+    ptr: &'a &'static VTableData,
+    phantom: PhantomData<&'a Trait>,
+}
 
-    fn deref(&self) -> &Self::Target {
-        unsafe {
-            let VTableData{offset, vtable} = **self.ptr;
-            let p = (self.ptr as *const _ as *const u8).offset(-offset) as *const ();
-            internal::TransmuterTO::<Trait>{ to: internal::TraitObject{ data: p, vtable: vtable } }.ptr
+impl<'a, Trait: ?Sized> LightRef<'a, Trait> {
+    pub fn new<T: HasVPtr<Trait>>(ptr: &'a VPtr<T, Trait>) -> Self {
+        LightRef {
+            ptr: &ptr.vtable,
+            phantom: PhantomData,
         }
     }
 }
 
-impl<'a, Trait : ?Sized + 'a> ::core::borrow::Borrow<Trait> for LightRef<'a, Trait> {
+impl<'a, Trait: ?Sized + 'a> ::core::ops::Deref for LightRef<'a, Trait> {
+    type Target = Trait;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe {
+            let VTableData { offset, vtable } = **self.ptr;
+            let p = (self.ptr as *const _ as *const u8).offset(-offset) as *const ();
+            internal::TransmuterTO::<Trait> {
+                to: internal::TraitObject { data: p, vtable },
+            }
+            .ptr
+        }
+    }
+}
+
+impl<'a, Trait: ?Sized + 'a> ::core::borrow::Borrow<Trait> for LightRef<'a, Trait> {
     fn borrow(&self) -> &Trait {
         &**self
     }
 }
 
-impl<'a, Trait : ?Sized + 'a, T: HasVPtr<Trait>> From<&'a T> for LightRef<'a, Trait> {
+impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a T> for LightRef<'a, Trait> {
     fn from(f: &'a T) -> Self {
         LightRef::new(f.get_vptr())
     }
@@ -201,13 +228,12 @@ impl<'a, Trait : ?Sized + 'a, T: HasVPtr<Trait>> From<&'a T> for LightRef<'a, Tr
 #[derive(Eq, Hash, PartialEq, PartialOrd)]
 pub struct VTableData {
     /// Offset, in byte, of the VPtr field within the struct
-    pub offset : isize,
+    pub offset: isize,
     /// Pointer to the actual vtable generated by rust (i.e., the second pointer in a TraitObject,
     /// or core::raw::TraitObject::vtable)
-    pub vtable : *const (),
+    pub vtable: *const (),
 }
 unsafe impl std::marker::Sync for VTableData {}
-
 
 #[doc(hidden)]
 pub mod internal {
@@ -236,7 +262,6 @@ pub mod internal {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     pub use super::*;
@@ -245,20 +270,18 @@ mod tests {
         pub use super::*;
     }
 
-
-
     trait MyTrait {
-        fn myfn(&self)  -> u32;
+        fn myfn(&self) -> u32;
     }
 
     #[vptr(MyTrait)]
     #[derive(Default)]
     struct Foobar2 {
-        q: u32
+        q: u32,
     }
 
     impl MyTrait for Foobar2 {
-        fn myfn(&self)  -> u32 {
+        fn myfn(&self) -> u32 {
             self.q + 4
         }
     }
@@ -271,20 +294,16 @@ mod tests {
 
         let xx = f.as_light_ref();
         assert_eq!(xx.myfn(), 9);
-
     }
-
-
-
 
     #[vptr(MyTrait, SomeOtherTrait)]
     #[derive(Default, Debug)]
     struct Foobar3 {
-        q: u32
+        q: u32,
     }
 
     impl MyTrait for Foobar3 {
-        fn myfn(&self)  -> u32 {
+        fn myfn(&self) -> u32 {
             self.q + 4
         }
     }
@@ -299,44 +318,43 @@ mod tests {
         println!("{:?}", f);
         assert_eq!(f.myfn(), 9);
 
-        let xx : LightRef<MyTrait> = f.as_light_ref();
+        let xx: LightRef<MyTrait> = f.as_light_ref();
         assert_eq!(xx.myfn(), 9);
-
     }
 
-/*
-    #[vptr(MyTrait)]
-    #[derive(Default)]
-    struct WithGenerics<T> {
-        pub foo: Vec<T>
-    }
-
-    impl<T> MyTrait for WithGenerics<T> {
-        fn myfn(&self)  -> u32 {
-            self.foo.len() as u32
+    /*
+        #[vptr(MyTrait)]
+        #[derive(Default)]
+        struct WithGenerics<T> {
+            pub foo: Vec<T>
         }
-    }
 
-    #[test]
-    fn with_generics() {
-        let mut f = WithGenerics::<u32>::default();
-        f.foo.push(3);
-        assert_eq!(f.myfn(), 1);
+        impl<T> MyTrait for WithGenerics<T> {
+            fn myfn(&self)  -> u32 {
+                self.foo.len() as u32
+            }
+        }
 
-        let xx : LightRef<MyTrait> = f.as_light_ref();
-        assert_eq!(xx.myfn(), 9);
+        #[test]
+        fn with_generics() {
+            let mut f = WithGenerics::<u32>::default();
+            f.foo.push(3);
+            assert_eq!(f.myfn(), 1);
 
-    }
-*/
+            let xx : LightRef<MyTrait> = f.as_light_ref();
+            assert_eq!(xx.myfn(), 9);
+
+        }
+    */
 
     #[vptr(MyTrait)]
     #[derive(Default)]
     struct WithLifeTime<'a> {
-        pub foo: Option<&'a u32>
+        pub foo: Option<&'a u32>,
     }
 
     impl<'a> MyTrait for WithLifeTime<'a> {
-        fn myfn(&self)  -> u32 {
+        fn myfn(&self) -> u32 {
             *self.foo.unwrap_or(&0)
         }
     }
@@ -348,42 +366,43 @@ mod tests {
         f.foo = Some(&x);
         assert_eq!(f.myfn(), 43);
 
-        let xx : LightRef<MyTrait> = f.as_light_ref();
+        let xx: LightRef<MyTrait> = f.as_light_ref();
         assert_eq!(xx.myfn(), 43);
-
     }
 
     #[vptr(MyTrait)]
     struct Tuple(u32, u32);
 
-    impl MyTrait for Tuple { fn myfn(&self) -> u32 { self.1 } }
+    impl MyTrait for Tuple {
+        fn myfn(&self) -> u32 {
+            self.1
+        }
+    }
     #[test]
     fn tuple() {
         let f = Tuple(42, 43, Default::default());
         assert_eq!(f.myfn(), 43);
 
-        let xx : LightRef<_> = f.as_light_ref();
+        let xx: LightRef<_> = f.as_light_ref();
         assert_eq!(xx.myfn(), 43);
-
     }
-
-
 
     #[vptr(MyTrait)]
     struct Empty1;
 
-    impl MyTrait for Empty1 { fn myfn(&self) -> u32 { 88 } }
+    impl MyTrait for Empty1 {
+        fn myfn(&self) -> u32 {
+            88
+        }
+    }
 
     #[test]
     fn empty_struct() {
         let f = Empty1(VPtr::new());
         assert_eq!(f.myfn(), 88);
 
-        let xx : LightRef<MyTrait> = f.as_light_ref();
+        let xx: LightRef<MyTrait> = f.as_light_ref();
         assert_eq!(xx.myfn(), 88);
-
     }
-
-
 
 }
