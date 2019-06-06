@@ -67,7 +67,7 @@
 //! # The `#[vptr]` macro
 //!
 //! The `#[vptr(Trait)]` macro can be applied to a struct and it adds members to the struct
-//! with pointer to the vtable, these members are of type Vptr<S, Trait>, where S is the struct.
+//! with pointer to the vtable, these members are of type VPtr<S, Trait>, where S is the struct.
 //! The macro also implements the `HasVPtr` trait which allow the creation of `LightRef` for this
 //!
 //! You probably want to derive from `Default`, otherwise, the extra fields needs to be initialized
@@ -107,9 +107,10 @@
 //! let pointref = LightRef::from(&p);
 //! assert_eq!(pointref.area(), 0.);
 //! ```
-
+#![cfg_attr(not(feature = "std"), no_std)]
+#![warn(missing_docs)]
 pub use ::vptr_macros::vptr;
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 /// Represent a pointer to a virtual table to the trait `Trait` that is to be embedded in
 /// a structure `T`
@@ -129,8 +130,8 @@ impl<T, Trait: ?Sized> VPtr<T, Trait>
 where
     T: HasVPtr<Trait>,
 {
-    // Creates a new VPtr initialized to a pointer of the vtable of the `Trait` for the type `T`.
-    // Same as VPtr::default()
+    /// Creates a new VPtr initialized to a pointer of the vtable of the `Trait` for the type `T`.
+    /// Same as VPtr::default()
     pub fn new() -> Self {
         VPtr {
             vtable: T::init(),
@@ -150,6 +151,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<T, Trait: ?Sized> std::fmt::Debug for VPtr<T, Trait>
 where
     T: HasVPtr<Trait>,
@@ -162,6 +164,10 @@ where
 /// This trait indicate that the type has a VPtr field to the trait `Trait`
 ///
 /// You should not implement this trait yourself, it is implemented by the `vptr` macro
+///
+/// Safety: For this to work correctly, the init() function must return a reference to a VTableData
+/// with valid content (the offset and vtable pointer need to be correct for this type) and
+/// get_vptr must return a reference of a field withi &self. The `#[vptr] macro does the right thing
 pub unsafe trait HasVPtr<Trait: ?Sized> {
     /// Initialize a VTableData suitable to initialize the VPtr within Self
     fn init() -> &'static VTableData;
@@ -171,15 +177,16 @@ pub unsafe trait HasVPtr<Trait: ?Sized> {
     where
         Self: Sized;
 
+    /// return a light reference to self
     fn as_light_ref(&self) -> LightRef<Trait>
     where
         Self: Sized,
     {
-        LightRef::new(self.get_vptr())
+        unsafe { LightRef::new(self.get_vptr()) }
     }
 }
 
-/// A light reference (size = `size_of(usize)`) to an object implementing the trait `Trait`
+/// A light reference (size = `size_of::<usize>()`) to an object implementing the trait `Trait`
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct LightRef<'a, Trait: ?Sized> {
     ptr: &'a &'static VTableData,
@@ -187,7 +194,10 @@ pub struct LightRef<'a, Trait: ?Sized> {
 }
 
 impl<'a, Trait: ?Sized> LightRef<'a, Trait> {
-    pub fn new<T: HasVPtr<Trait>>(ptr: &'a VPtr<T, Trait>) -> Self {
+    /// Create a new reference from a reference to a VPtr
+    ///
+    /// Safety: the ptr must be a field of a reference to T
+    unsafe fn new<T: HasVPtr<Trait>>(ptr: &'a VPtr<T, Trait>) -> Self {
         LightRef {
             ptr: &ptr.vtable,
             phantom: PhantomData,
@@ -218,7 +228,7 @@ impl<'a, Trait: ?Sized + 'a> ::core::borrow::Borrow<Trait> for LightRef<'a, Trai
 
 impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a T> for LightRef<'a, Trait> {
     fn from(f: &'a T) -> Self {
-        LightRef::new(f.get_vptr())
+        unsafe { LightRef::new(f.get_vptr()) }
     }
 }
 
@@ -233,7 +243,7 @@ pub struct VTableData {
     /// or core::raw::TraitObject::vtable)
     pub vtable: *const (),
 }
-unsafe impl std::marker::Sync for VTableData {}
+unsafe impl core::marker::Sync for VTableData {}
 
 #[doc(hidden)]
 pub mod internal {

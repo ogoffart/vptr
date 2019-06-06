@@ -4,5 +4,9 @@ version = "0.1.0"
 authors = ["Olivier Goffart <ogoffart@woboq.com>"]
 edition = "2018"
 
+[features]
+default = ["std"]
+std = []
+
 [dependencies]
 vptr-macros = {path = "./macros", version = "=0.1.0"}

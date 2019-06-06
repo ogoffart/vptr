@@ -1,4 +1,5 @@
 #![recursion_limit = "128"]
+//! Refer to the documentation of the `vptr` crate
 
 extern crate proc_macro;
 use proc_macro::TokenStream;
@@ -6,7 +7,7 @@ use quote::quote;
 use syn::parse::Parser;
 use syn::{self, spanned::Spanned, AttributeArgs, Ident, ItemStruct};
 
-/// Refer to the documentation of the vptr crate
+/// Refer to the documentation of the `vptr` crate
 #[proc_macro_attribute]
 pub fn vptr(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr = syn::parse_macro_input!(attr as AttributeArgs);
