@@ -314,8 +314,17 @@ impl<'a, Trait: ?Sized + 'a> Deref for LightRefMut<'a, Trait> {
 impl<'a, Trait: ?Sized + 'a> DerefMut for LightRefMut<'a, Trait> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe {
-            // ### check: is that a valid way?
-            core::mem::transmute(Deref::deref(self) as *const Trait)
+            let VTableData { offset, vtable } = **self.ptr;
+            let p = (self.ptr as *mut _ as *mut u8).offset(-offset) as *mut ();
+            union Transmuter<T: ?Sized> {
+                pub ptr: *mut T,
+                pub to: internal::TraitObject,
+            }
+            let ptr = Transmuter::<Trait> {
+                to: internal::TraitObject { data: p, vtable },
+            }
+            .ptr;
+            &mut *ptr
         }
     }
 }
@@ -359,6 +368,7 @@ impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a mut T> for LightRefMut<
 pub struct LightBox<Trait: ?Sized + 'static>(*mut &'static VTableData, PhantomData<*mut Trait>);
 
 #[cfg(feature = "std")]
+#[allow(clippy::wrong_self_convention)]
 impl<Trait: ?Sized + 'static> LightBox<Trait> {
     /// Creates a LightBox from a Box
     pub fn from_box<T: HasVPtr<Trait>>(f: Box<T>) -> Self {
