@@ -6,7 +6,7 @@ Enable light references to trait
 
 ### What are trait object and virtual table ?
 
-In rust, you can have dynammic dispatch with the so-called Trait object.
+In rust, you can have dynamic dispatch with the so-called Trait object.
 Here is a typical example
 
 ```rust
@@ -30,7 +30,7 @@ virtual table. Having only a pointer to the struct itself would not be enough as
 `total_area` does not know the exact type of what it is pointed to, so it would not know from
 which `impl` to call the `area` function.
 
-This box diagram show a simplified representation of the memory layout
+This box diagram shows a simplified representation of the memory layout
 
 ```ascii
    &dyn Shape      ╭──────> Rectangle     ╭─> vtable of Shape for Rectangle
@@ -43,11 +43,11 @@ This box diagram show a simplified representation of the memory layout
                                                    ╏         ╏
 ```
 
-Other language such as C++ implements that differently: in C++, each instance of a dynamic class
-has a pointer to the virtual table, inside of the class. So the pointer are just normal
-pointers.
+Other languages such as C++ implements that differently: in C++, each instance of a dynamic class
+has a pointer to the virtual table, inside of the class. So just a normal pointer to the base class
+is enough to do dynamic dispatch
 
-Both approach have pros and cons: in Rust, the object themselves are a bit smaller as they
+Both approaches have pros and cons: in Rust, the object themselves are a bit smaller as they
 do not have a pointer to the virtual table. They can also implement trait from other crates
 which would not work in C++ as it would have to somehow put the pointer to the virtual table
 inside the object. But rust pointer to trait are twice as big as normal pointer. Which is
@@ -70,7 +70,7 @@ struct Circle { r: f32 }
 impl Shape for Circle { fn area(&self) -> f32 { 3.14 * self.r * self.r } }
 
 // Given an array of Shape, compute the sum of their area
-fn total_area(list: &[LightRef<Shape>]) -> f32 {
+fn total_area(list: &[LightRef<dyn Shape>]) -> f32 {
     list.iter().map(|x| x.area()).fold(0., |a, b| a+b)
 }
 ```
@@ -117,8 +117,8 @@ impl Display for Rectangle {
 // [...]
 let mut r1 = Rectangle::default();
 r1.w = 10.; r1.h = 5.;
-let ref1 = LightRef::<Shape>::from(&r1);
-assert_eq!(mem::size_of::<LightRef<Shape>>(), mem::size_of::<usize>());
+let ref1 = LightRef::<dyn Shape>::from(&r1);
+assert_eq!(mem::size_of::<LightRef<dyn Shape>>(), mem::size_of::<usize>());
 assert_eq!(ref1.area(), 50.);
 
 // When not initializing with default, you must initialize the vptr's manually
@@ -132,3 +132,5 @@ let p = Point(1, 2, VPtr::new());
 let pointref = LightRef::from(&p);
 assert_eq!(pointref.area(), 0.);
 ```
+
+License: MIT

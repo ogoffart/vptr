@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["Olivier Goffart <ogoffart@woboq.com>"]
 description = "Procedural macros for vptr"
 edition = "2018"
+license = "MIT"
+repository = "https://github.com/ogoffart/vptr"
+documentation = "https://docs.rs/vptr"
+
 
 [lib]
 path = "macros.rs"

@@ -3,6 +3,13 @@ name = "vptr"
 version = "0.1.0"
 authors = ["Olivier Goffart <ogoffart@woboq.com>"]
 edition = "2018"
+description = "Light references to trait objects by embedding the virtual table pointer in the struct"
+readme = "README.md"
+license = "MIT"
+keywords = ["vtable", "thin", "light", "references", "virtual table", "trait object"]
+categories = [ "memory-management" ]
+repository = "https://github.com/ogoffart/vptr"
+documentation = "https://docs.rs/vptr"
 
 [features]
 default = ["std"]

@@ -1,10 +1,28 @@
+/* Copyright (C) 2019 Olivier Goffart <ogoffart@woboq.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial
+portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES
+OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
 /*! Enable light references to trait
 
 # Intro
 
 ## What are trait object and virtual table ?
 
-In rust, you can have dynammic dispatch with the so-called Trait object.
+In rust, you can have dynamic dispatch with the so-called Trait object.
 Here is a typical example
 
 ```rust
@@ -28,7 +46,7 @@ virtual table. Having only a pointer to the struct itself would not be enough as
 `total_area` does not know the exact type of what it is pointed to, so it would not know from
 which `impl` to call the `area` function.
 
-This box diagram show a simplified representation of the memory layout
+This box diagram shows a simplified representation of the memory layout
 
 ```ascii
    &dyn Shape      ╭──────> Rectangle     ╭─> vtable of Shape for Rectangle
@@ -41,11 +59,11 @@ This box diagram show a simplified representation of the memory layout
                                                    ╏         ╏
 ```
 
-Other language such as C++ implements that differently: in C++, each instance of a dynamic class
-has a pointer to the virtual table, inside of the class. So the pointer are just normal
-pointers.
+Other languages such as C++ implements that differently: in C++, each instance of a dynamic class
+has a pointer to the virtual table, inside of the class. So just a normal pointer to the base class
+is enough to do dynamic dispatch
 
-Both approach have pros and cons: in Rust, the object themselves are a bit smaller as they
+Both approaches have pros and cons: in Rust, the object themselves are a bit smaller as they
 do not have a pointer to the virtual table. They can also implement trait from other crates
 which would not work in C++ as it would have to somehow put the pointer to the virtual table
 inside the object. But rust pointer to trait are twice as big as normal pointer. Which is
