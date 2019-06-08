@@ -69,7 +69,7 @@ struct Circle { r: f32 }
 impl Shape for Circle { fn area(&self) -> f32 { 3.14 * self.r * self.r } }
 
 // Given an array of Shape, compute the sum of their area
-fn total_area(list: &[LightRef<Shape>]) -> f32 {
+fn total_area(list: &[LightRef<dyn Shape>]) -> f32 {
     list.iter().map(|x| x.area()).fold(0., |a, b| a+b)
 }
 ```
@@ -118,8 +118,8 @@ impl Display for Rectangle {
 // [...]
 let mut r1 = Rectangle::default();
 r1.w = 10.; r1.h = 5.;
-let ref1 = LightRef::<Shape>::from(&r1);
-assert_eq!(mem::size_of::<LightRef<Shape>>(), mem::size_of::<usize>());
+let ref1 = LightRef::<dyn Shape>::from(&r1);
+assert_eq!(mem::size_of::<LightRef<dyn Shape>>(), mem::size_of::<usize>());
 assert_eq!(ref1.area(), 50.);
 
 // When not initializing with default, you must initialize the vptr's manually
@@ -525,12 +525,12 @@ mod tests {
         assert_eq!(f.myfn(), 9);
 
         {
-            let xx: LightRef<MyTrait> = f.as_light_ref();
+            let xx: LightRef<dyn MyTrait> = f.as_light_ref();
             assert_eq!(xx.myfn(), 9);
         }
 
         {
-            let xx: LightRefMut<MyTrait> = f.as_light_ref_mut();
+            let xx: LightRefMut<dyn MyTrait> = f.as_light_ref_mut();
             assert_eq!(xx.myfn(), 9);
         }
     }
@@ -554,7 +554,7 @@ mod tests {
         f.foo.push(3);
         assert_eq!(f.myfn(), 1);
 
-        let xx : LightRef<MyTrait> = f.as_light_ref();
+        let xx : LightRef<dyn MyTrait> = f.as_light_ref();
         assert_eq!(xx.myfn(), 9);
 
     }
@@ -579,7 +579,7 @@ mod tests {
         f.foo = Some(&x);
         assert_eq!(f.myfn(), 43);
 
-        let xx: LightRef<MyTrait> = f.as_light_ref();
+        let xx: LightRef<dyn MyTrait> = f.as_light_ref();
         assert_eq!(xx.myfn(), 43);
     }
 
@@ -614,7 +614,7 @@ mod tests {
         let f = Empty1(VPtr::new());
         assert_eq!(f.myfn(), 88);
 
-        let xx: LightRef<MyTrait> = f.as_light_ref();
+        let xx: LightRef<dyn MyTrait> = f.as_light_ref();
         assert_eq!(xx.myfn(), 88);
     }
 
