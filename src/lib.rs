@@ -356,16 +356,19 @@ impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a mut T> for LightRefMut<
 /// assert_eq!(light.area(), 50.);
 /// ```
 #[cfg(feature = "std")]
-pub struct LightBox<Trait : ?Sized + 'static>(*mut &'static VTableData, PhantomData<*mut Trait>);
+pub struct LightBox<Trait: ?Sized + 'static>(*mut &'static VTableData, PhantomData<*mut Trait>);
 
 #[cfg(feature = "std")]
 impl<Trait: ?Sized + 'static> LightBox<Trait> {
     /// Creates a LightBox from a Box
-    pub fn from_box<T : HasVPtr<Trait>>(f : Box<T>) -> Self {
-        LightBox((&mut Box::leak(f).get_vptr_mut().vtable) as *mut &'static VTableData, PhantomData)
+    pub fn from_box<T: HasVPtr<Trait>>(f: Box<T>) -> Self {
+        LightBox(
+            (&mut Box::leak(f).get_vptr_mut().vtable) as *mut &'static VTableData,
+            PhantomData,
+        )
     }
     /// Conver the LightBox into a Box
-    pub fn into_box(mut b : LightBox<Trait>) -> Box<Trait> {
+    pub fn into_box(mut b: LightBox<Trait>) -> Box<Trait> {
         let ptr = (&mut *LightBox::as_light_ref_mut(&mut b)) as *mut Trait;
         core::mem::forget(b);
         unsafe { Box::from_raw(ptr) }
@@ -373,12 +376,18 @@ impl<Trait: ?Sized + 'static> LightBox<Trait> {
 
     /// As a LightRef
     pub fn as_light_ref(b: &LightBox<Trait>) -> LightRef<Trait> {
-        LightRef { ptr: unsafe { (& *b.0) as & &'static VTableData} , phantom: PhantomData }
+        LightRef {
+            ptr: unsafe { (&*b.0) as &&'static VTableData },
+            phantom: PhantomData,
+        }
     }
 
     /// As a LightRefMut
     pub fn as_light_ref_mut(b: &mut LightBox<Trait>) -> LightRefMut<Trait> {
-        LightRefMut { ptr: unsafe { (&mut *b.0) as &mut &'static VTableData} , phantom: PhantomData }
+        LightRefMut {
+            ptr: unsafe { (&mut *b.0) as &mut &'static VTableData },
+            phantom: PhantomData,
+        }
     }
 }
 
@@ -453,6 +462,7 @@ mod tests {
     pub use super::*;
 
     mod vptr {
+        // Because otherwise, the generated code cannot access the vptr crate.
         pub use super::*;
     }
 
@@ -516,28 +526,28 @@ mod tests {
     }
 
     /*
-        #[vptr(MyTrait)]
-        #[derive(Default)]
-        struct WithGenerics<T> {
-            pub foo: Vec<T>
+    #[vptr(MyTrait)]
+    #[derive(Default)]
+    struct WithGenerics<T> {
+        pub foo: Vec<T>
+    }
+
+    impl<T> MyTrait for WithGenerics<T> {
+        fn myfn(&self)  -> u32 {
+            self.foo.len() as u32
         }
+    }
 
-        impl<T> MyTrait for WithGenerics<T> {
-            fn myfn(&self)  -> u32 {
-                self.foo.len() as u32
-            }
-        }
+    #[test]
+    fn with_generics() {
+        let mut f = WithGenerics::<u32>::default();
+        f.foo.push(3);
+        assert_eq!(f.myfn(), 1);
 
-        #[test]
-        fn with_generics() {
-            let mut f = WithGenerics::<u32>::default();
-            f.foo.push(3);
-            assert_eq!(f.myfn(), 1);
+        let xx : LightRef<MyTrait> = f.as_light_ref();
+        assert_eq!(xx.myfn(), 9);
 
-            let xx : LightRef<MyTrait> = f.as_light_ref();
-            assert_eq!(xx.myfn(), 9);
-
-        }
+    }
     */
 
     #[vptr(MyTrait)]
