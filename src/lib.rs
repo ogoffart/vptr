@@ -159,6 +159,7 @@ pub use ::vptr_macros::vptr;
 use core::borrow::{Borrow, BorrowMut};
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
+use core::ptr::NonNull;
 #[cfg(feature = "std")]
 use std::boxed::Box;
 
@@ -250,6 +251,20 @@ pub unsafe trait HasVPtr<Trait: ?Sized> {
 }
 
 /// A light reference (size = `size_of::<usize>()`) to an object implementing the trait `Trait`
+///
+/// This is like a reference to a trait (`&dyn Trait`) for struct that used
+/// the macro `#[vptr(Trait)]`
+///
+/// See the crate documentation for example of usage.
+///
+/// The size is only the size of a single pointer:
+/// ```rust
+/// # use vptr::*;
+/// # use std::mem;
+/// # trait Trait { }
+/// assert_eq!(mem::size_of::<LightRef<dyn Trait>>(), mem::size_of::<usize>());
+/// assert_eq!(mem::size_of::<Option<LightRef<dyn Trait>>>(), mem::size_of::<usize>());
+/// ```
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct LightRef<'a, Trait: ?Sized> {
     ptr: &'a &'static VTableData,
@@ -296,6 +311,8 @@ impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a T> for LightRef<'a, Tra
 }
 
 /// A light reference (size = `size_of::<usize>()`) to an object implementing the trait `Trait`
+///
+/// Same as LightRef but for mutable references
 #[derive(Eq, PartialEq)]
 pub struct LightRefMut<'a, Trait: ?Sized> {
     ptr: &'a mut &'static VTableData,
@@ -382,8 +399,18 @@ impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a mut T> for LightRefMut<
 /// let light = LightBox::from_box(r);
 /// assert_eq!(light.area(), 50.);
 /// ```
+///
+/// The size is the size of a pointer
+/// ```rust
+/// # use vptr::*;
+/// # use std::mem;
+/// # trait Trait { }
+/// assert_eq!(mem::size_of::<LightBox<dyn Trait>>(), mem::size_of::<usize>());
+/// assert_eq!(mem::size_of::<Option<LightBox<dyn Trait>>>(), mem::size_of::<usize>());
+/// ```
 #[cfg(feature = "std")]
-pub struct LightBox<Trait: ?Sized + 'static>(*mut &'static VTableData, PhantomData<*mut Trait>);
+#[repr(transparent)]
+pub struct LightBox<Trait: ?Sized + 'static>(NonNull<&'static VTableData>, PhantomData<*mut Trait>);
 
 #[cfg(feature = "std")]
 #[allow(clippy::wrong_self_convention)]
@@ -391,7 +418,7 @@ impl<Trait: ?Sized + 'static> LightBox<Trait> {
     /// Creates a LightBox from a Box
     pub fn from_box<T: HasVPtr<Trait>>(f: Box<T>) -> Self {
         LightBox(
-            (&mut Box::leak(f).get_vptr_mut().vtable) as *mut &'static VTableData,
+            NonNull::from(&mut Box::leak(f).get_vptr_mut().vtable),
             PhantomData,
         )
     }
@@ -405,7 +432,7 @@ impl<Trait: ?Sized + 'static> LightBox<Trait> {
     /// As a LightRef
     pub fn as_light_ref(b: &LightBox<Trait>) -> LightRef<Trait> {
         LightRef {
-            ptr: unsafe { (&*b.0) as &&'static VTableData },
+            ptr: unsafe { b.0.as_ref() },
             phantom: PhantomData,
         }
     }
@@ -413,7 +440,7 @@ impl<Trait: ?Sized + 'static> LightBox<Trait> {
     /// As a LightRefMut
     pub fn as_light_ref_mut(b: &mut LightBox<Trait>) -> LightRefMut<Trait> {
         LightRefMut {
-            ptr: unsafe { (&mut *b.0) as &mut &'static VTableData },
+            ptr: unsafe { b.0.as_mut() },
             phantom: PhantomData,
         }
     }
