@@ -102,7 +102,7 @@ fn vptr_impl(attr: AttributeArgs, item: ItemStruct) -> Result<TokenStream, syn::
             .iter()
             .enumerate()
             .map(|(i, t)| {
-                let field_name = i + count;
+                let field_name = syn::Index::from(i + count);
                 (t, quote! { #field_name })
             })
             .collect();
