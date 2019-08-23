@@ -71,7 +71,7 @@ usually not a problem. Unless of course you want to pack many trait object refer
 in constrained memory, or pass them through ffi to C function that only handle pointer as data.
 That's where this crate comes in!
 
-## Light references
+## Thin references
 
 This crates allows to easily opt in to light references to trait for a type, by having
 pointers to the virtual table within the object.
@@ -87,17 +87,17 @@ struct Circle { r: f32 }
 impl Shape for Circle { fn area(&self) -> f32 { 3.14 * self.r * self.r } }
 
 // Given an array of Shape, compute the sum of their area
-fn total_area(list: &[LightRef<dyn Shape>]) -> f32 {
+fn total_area(list: &[ThinRef<dyn Shape>]) -> f32 {
     list.iter().map(|x| x.area()).fold(0., |a, b| a+b)
 }
 ```
 
-Same as before, but we added `#[vptr(Shape)]` and are now using `LightRef<Shape>` instead of
-`&dyn Shame`.  The difference is that the LightRef has only the size of one pointer
+Same as before, but we added `#[vptr(Shape)]` and are now using `ThinRef<Shape>` instead of
+`&dyn Shame`.  The difference is that the ThinRef has only the size of one pointer
 
 
 ```ascii
- LightRef<Shape>       Rectangle          ╭─>VTableData  ╭─>vtable of Shape for Rectangle
+ ThinRef<Shape>        Rectangle          ╭─>VTableData  ╭─>vtable of Shape for Rectangle
  ┏━━━━━━━━━━━━━┓      ┏━━━━━━━━━━━━┓ ╮    │  ┏━━━━━━━━┓  │     ┏━━━━━━━━━┓
  ┃ ptr         ┠──╮   ┃ w          ┃ │ ╭──│──┨ offset ┃  │     ┃ area()  ┃
  ┗━━━━━━━━━━━━━┛  │   ┣━━━━━━━━━━━━┫ ⎬─╯  │  ┣━━━━━━━━┫  │     ┣━━━━━━━━━┫
@@ -112,7 +112,7 @@ Same as before, but we added `#[vptr(Shape)]` and are now using `LightRef<Shape>
 
 The `#[vptr(Trait)]` macro can be applied to a struct and it adds members to the struct
 with pointer to the vtable, these members are of type VPtr<S, Trait>, where S is the struct.
-The macro also implements the `HasVPtr` trait which allow the creation of `LightRef` for this
+The macro also implements the `HasVPtr` trait which allow the creation of `ThinRef` for this
 
 You probably want to derive from `Default`, otherwise, the extra fields needs to be initialized
 manually (with `Default::default()` or `VPtr::new()`)
@@ -136,8 +136,8 @@ impl Display for Rectangle {
 // [...]
 let mut r1 = Rectangle::default();
 r1.w = 10.; r1.h = 5.;
-let ref1 = LightRef::<dyn Shape>::from(&r1);
-assert_eq!(mem::size_of::<LightRef<dyn Shape>>(), mem::size_of::<usize>());
+let ref1 = ThinRef::<dyn Shape>::from(&r1);
+assert_eq!(mem::size_of::<ThinRef<dyn Shape>>(), mem::size_of::<usize>());
 assert_eq!(ref1.area(), 50.);
 
 // When not initializing with default, you must initialize the vptr's manually
@@ -148,7 +148,7 @@ let r3 = Rectangle{ w: 1., h: 2., vptr_Shape: VPtr::new(), vptr_ToString: VPtr::
 #[vptr(Shape)] struct Point(u32, u32);
 impl Shape for Point { fn area(&self) -> f32 { 0. } }
 let p = Point(1, 2, VPtr::new());
-let pointref = LightRef::from(&p);
+let pointref = ThinRef::from(&p);
 assert_eq!(pointref.area(), 0.);
 ```
 */
@@ -234,19 +234,19 @@ pub unsafe trait HasVPtr<Trait: ?Sized> {
         Self: Sized;
 
     /// return a light reference to self
-    fn as_light_ref(&self) -> LightRef<Trait>
+    fn as_light_ref(&self) -> ThinRef<Trait>
     where
         Self: Sized,
     {
-        unsafe { LightRef::new(self.get_vptr()) }
+        unsafe { ThinRef::new(self.get_vptr()) }
     }
 
     /// return a light reference to self
-    fn as_light_ref_mut(&mut self) -> LightRefMut<Trait>
+    fn as_light_ref_mut(&mut self) -> ThinRefMut<Trait>
     where
         Self: Sized,
     {
-        unsafe { LightRefMut::new(self.get_vptr_mut()) }
+        unsafe { ThinRefMut::new(self.get_vptr_mut()) }
     }
 }
 
@@ -262,28 +262,28 @@ pub unsafe trait HasVPtr<Trait: ?Sized> {
 /// # use vptr::*;
 /// # use std::mem;
 /// # trait Trait { }
-/// assert_eq!(mem::size_of::<LightRef<dyn Trait>>(), mem::size_of::<usize>());
-/// assert_eq!(mem::size_of::<Option<LightRef<dyn Trait>>>(), mem::size_of::<usize>());
+/// assert_eq!(mem::size_of::<ThinRef<dyn Trait>>(), mem::size_of::<usize>());
+/// assert_eq!(mem::size_of::<Option<ThinRef<dyn Trait>>>(), mem::size_of::<usize>());
 /// ```
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub struct LightRef<'a, Trait: ?Sized> {
+pub struct ThinRef<'a, Trait: ?Sized> {
     ptr: &'a &'static VTableData,
     phantom: PhantomData<&'a Trait>,
 }
 
-impl<'a, Trait: ?Sized> LightRef<'a, Trait> {
+impl<'a, Trait: ?Sized> ThinRef<'a, Trait> {
     /// Create a new reference from a reference to a VPtr
     ///
     /// Safety: the ptr must be a field of a reference to T
     unsafe fn new<T: HasVPtr<Trait>>(ptr: &'a VPtr<T, Trait>) -> Self {
-        LightRef {
+        ThinRef {
             ptr: &ptr.vtable,
             phantom: PhantomData,
         }
     }
 }
 
-impl<'a, Trait: ?Sized + 'a> Deref for LightRef<'a, Trait> {
+impl<'a, Trait: ?Sized + 'a> Deref for ThinRef<'a, Trait> {
     type Target = Trait;
 
     fn deref(&self) -> &Self::Target {
@@ -298,40 +298,40 @@ impl<'a, Trait: ?Sized + 'a> Deref for LightRef<'a, Trait> {
     }
 }
 
-impl<'a, Trait: ?Sized + 'a> Borrow<Trait> for LightRef<'a, Trait> {
+impl<'a, Trait: ?Sized + 'a> Borrow<Trait> for ThinRef<'a, Trait> {
     fn borrow(&self) -> &Trait {
         &**self
     }
 }
 
-impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a T> for LightRef<'a, Trait> {
+impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a T> for ThinRef<'a, Trait> {
     fn from(f: &'a T) -> Self {
-        unsafe { LightRef::new(f.get_vptr()) }
+        unsafe { ThinRef::new(f.get_vptr()) }
     }
 }
 
 /// A light reference (size = `size_of::<usize>()`) to an object implementing the trait `Trait`
 ///
-/// Same as LightRef but for mutable references
+/// Same as ThinRef but for mutable references
 #[derive(Eq, PartialEq)]
-pub struct LightRefMut<'a, Trait: ?Sized> {
+pub struct ThinRefMut<'a, Trait: ?Sized> {
     ptr: &'a mut &'static VTableData,
     phantom: PhantomData<&'a mut Trait>,
 }
 
-impl<'a, Trait: ?Sized> LightRefMut<'a, Trait> {
+impl<'a, Trait: ?Sized> ThinRefMut<'a, Trait> {
     /// Create a new reference from a reference to a VPtr
     ///
     /// Safety: the ptr must be a field of a reference to T
     unsafe fn new<T: HasVPtr<Trait>>(ptr: &'a mut VPtr<T, Trait>) -> Self {
-        LightRefMut {
+        ThinRefMut {
             ptr: &mut ptr.vtable,
             phantom: PhantomData,
         }
     }
 }
 
-impl<'a, Trait: ?Sized + 'a> Deref for LightRefMut<'a, Trait> {
+impl<'a, Trait: ?Sized + 'a> Deref for ThinRefMut<'a, Trait> {
     type Target = Trait;
 
     fn deref(&self) -> &Self::Target {
@@ -346,7 +346,7 @@ impl<'a, Trait: ?Sized + 'a> Deref for LightRefMut<'a, Trait> {
     }
 }
 
-impl<'a, Trait: ?Sized + 'a> DerefMut for LightRefMut<'a, Trait> {
+impl<'a, Trait: ?Sized + 'a> DerefMut for ThinRefMut<'a, Trait> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe {
             let VTableData { offset, vtable } = **self.ptr;
@@ -364,27 +364,27 @@ impl<'a, Trait: ?Sized + 'a> DerefMut for LightRefMut<'a, Trait> {
     }
 }
 
-impl<'a, Trait: ?Sized + 'a> Borrow<Trait> for LightRefMut<'a, Trait> {
+impl<'a, Trait: ?Sized + 'a> Borrow<Trait> for ThinRefMut<'a, Trait> {
     fn borrow(&self) -> &Trait {
         &**self
     }
 }
 
-impl<'a, Trait: ?Sized + 'a> BorrowMut<Trait> for LightRefMut<'a, Trait> {
+impl<'a, Trait: ?Sized + 'a> BorrowMut<Trait> for ThinRefMut<'a, Trait> {
     fn borrow_mut(&mut self) -> &mut Trait {
         &mut **self
     }
 }
 
-impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a mut T> for LightRefMut<'a, Trait> {
+impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a mut T> for ThinRefMut<'a, Trait> {
     fn from(f: &'a mut T) -> Self {
-        unsafe { LightRefMut::new(f.get_vptr_mut()) }
+        unsafe { ThinRefMut::new(f.get_vptr_mut()) }
     }
 }
 
 /// A Box of a trait with a size of `size_of::<usize>`
 ///
-/// The LightBox can be created from a Box which implement the HasVPtr<Trait>
+/// The ThinBox can be created from a Box which implement the HasVPtr<Trait>
 ///
 ///
 /// ```rust
@@ -396,7 +396,7 @@ impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a mut T> for LightRefMut<
 /// impl Shape for Rectangle { fn area(&self) -> f32 { self.w * self.h } }
 ///
 /// let r = Box::new(Rectangle { w: 5., h: 10., ..Default::default() });
-/// let light = LightBox::from_box(r);
+/// let light = ThinBox::from_box(r);
 /// assert_eq!(light.area(), 50.);
 /// ```
 ///
@@ -405,41 +405,41 @@ impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a mut T> for LightRefMut<
 /// # use vptr::*;
 /// # use std::mem;
 /// # trait Trait { }
-/// assert_eq!(mem::size_of::<LightBox<dyn Trait>>(), mem::size_of::<usize>());
-/// assert_eq!(mem::size_of::<Option<LightBox<dyn Trait>>>(), mem::size_of::<usize>());
+/// assert_eq!(mem::size_of::<ThinBox<dyn Trait>>(), mem::size_of::<usize>());
+/// assert_eq!(mem::size_of::<Option<ThinBox<dyn Trait>>>(), mem::size_of::<usize>());
 /// ```
 #[cfg(feature = "std")]
 #[repr(transparent)]
-pub struct LightBox<Trait: ?Sized + 'static>(NonNull<&'static VTableData>, PhantomData<*mut Trait>);
+pub struct ThinBox<Trait: ?Sized + 'static>(NonNull<&'static VTableData>, PhantomData<*mut Trait>);
 
 #[cfg(feature = "std")]
 #[allow(clippy::wrong_self_convention)]
-impl<Trait: ?Sized + 'static> LightBox<Trait> {
-    /// Creates a LightBox from a Box
+impl<Trait: ?Sized + 'static> ThinBox<Trait> {
+    /// Creates a ThinBox from a Box
     pub fn from_box<T: HasVPtr<Trait>>(f: Box<T>) -> Self {
-        LightBox(
+        ThinBox(
             NonNull::from(&mut Box::leak(f).get_vptr_mut().vtable),
             PhantomData,
         )
     }
-    /// Conver the LightBox into a Box
-    pub fn into_box(mut b: LightBox<Trait>) -> Box<Trait> {
-        let ptr = (&mut *LightBox::as_light_ref_mut(&mut b)) as *mut Trait;
+    /// Conver the ThinBox into a Box
+    pub fn into_box(mut b: ThinBox<Trait>) -> Box<Trait> {
+        let ptr = (&mut *ThinBox::as_light_ref_mut(&mut b)) as *mut Trait;
         core::mem::forget(b);
         unsafe { Box::from_raw(ptr) }
     }
 
-    /// As a LightRef
-    pub fn as_light_ref(b: &LightBox<Trait>) -> LightRef<Trait> {
-        LightRef {
+    /// As a ThinRef
+    pub fn as_light_ref(b: &ThinBox<Trait>) -> ThinRef<Trait> {
+        ThinRef {
             ptr: unsafe { b.0.as_ref() },
             phantom: PhantomData,
         }
     }
 
-    /// As a LightRefMut
-    pub fn as_light_ref_mut(b: &mut LightBox<Trait>) -> LightRefMut<Trait> {
-        LightRefMut {
+    /// As a ThinRefMut
+    pub fn as_light_ref_mut(b: &mut ThinBox<Trait>) -> ThinRefMut<Trait> {
+        ThinRefMut {
             ptr: unsafe { b.0.as_mut() },
             phantom: PhantomData,
         }
@@ -447,27 +447,27 @@ impl<Trait: ?Sized + 'static> LightBox<Trait> {
 }
 
 #[cfg(feature = "std")]
-impl<Trait: ?Sized + 'static> Drop for LightBox<Trait> {
+impl<Trait: ?Sized + 'static> Drop for ThinBox<Trait> {
     fn drop(&mut self) {
-        let ptr = &mut *LightBox::as_light_ref_mut(self) as *mut Trait;
+        let ptr = &mut *ThinBox::as_light_ref_mut(self) as *mut Trait;
         unsafe { Box::from_raw(ptr) };
     }
 }
 
 #[cfg(feature = "std")]
-impl<Trait: ?Sized + 'static> Deref for LightBox<Trait> {
+impl<Trait: ?Sized + 'static> Deref for ThinBox<Trait> {
     type Target = Trait;
 
     fn deref(&self) -> &Self::Target {
-        let ptr = &*LightBox::as_light_ref(self) as *const Trait;
+        let ptr = &*ThinBox::as_light_ref(self) as *const Trait;
         unsafe { &*ptr }
     }
 }
 
 #[cfg(feature = "std")]
-impl<Trait: ?Sized + 'static> DerefMut for LightBox<Trait> {
+impl<Trait: ?Sized + 'static> DerefMut for ThinBox<Trait> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        let ptr = &mut *LightBox::as_light_ref_mut(self) as *mut Trait;
+        let ptr = &mut *ThinBox::as_light_ref_mut(self) as *mut Trait;
         unsafe { &mut *ptr }
     }
 }
@@ -570,12 +570,12 @@ mod tests {
         assert_eq!(f.myfn(), 9);
 
         {
-            let xx: LightRef<dyn MyTrait> = f.as_light_ref();
+            let xx: ThinRef<dyn MyTrait> = f.as_light_ref();
             assert_eq!(xx.myfn(), 9);
         }
 
         {
-            let xx: LightRefMut<dyn MyTrait> = f.as_light_ref_mut();
+            let xx: ThinRefMut<dyn MyTrait> = f.as_light_ref_mut();
             assert_eq!(xx.myfn(), 9);
         }
     }
@@ -599,7 +599,7 @@ mod tests {
         f.foo.push(3);
         assert_eq!(f.myfn(), 1);
 
-        let xx : LightRef<dyn MyTrait> = f.as_light_ref();
+        let xx : ThinRef<dyn MyTrait> = f.as_light_ref();
         assert_eq!(xx.myfn(), 9);
 
     }
@@ -624,7 +624,7 @@ mod tests {
         f.foo = Some(&x);
         assert_eq!(f.myfn(), 43);
 
-        let xx: LightRef<dyn MyTrait> = f.as_light_ref();
+        let xx: ThinRef<dyn MyTrait> = f.as_light_ref();
         assert_eq!(xx.myfn(), 43);
     }
 
@@ -641,7 +641,7 @@ mod tests {
         let f = Tuple(42, 43, Default::default());
         assert_eq!(f.myfn(), 43);
 
-        let xx: LightRef<_> = f.as_light_ref();
+        let xx: ThinRef<_> = f.as_light_ref();
         assert_eq!(xx.myfn(), 43);
     }
 
@@ -659,7 +659,7 @@ mod tests {
         let f = Empty1(VPtr::new());
         assert_eq!(f.myfn(), 88);
 
-        let xx: LightRef<dyn MyTrait> = f.as_light_ref();
+        let xx: ThinRef<dyn MyTrait> = f.as_light_ref();
         assert_eq!(xx.myfn(), 88);
     }
 
@@ -676,7 +676,7 @@ mod tests {
     #[test]
     fn with_path() {
         let x = TestDisplay{ str: "Hello".to_string(), vptr_Display: Default::default() };
-        let xx : LightRef<dyn std::fmt::Display> = x.as_light_ref();
+        let xx : ThinRef<dyn std::fmt::Display> = x.as_light_ref();
         assert_eq!(xx.to_string(), "Test Hello");
     }
 

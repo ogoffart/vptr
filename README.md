@@ -55,7 +55,7 @@ usually not a problem. Unless of course you want to pack many trait object refer
 in constrained memory, or pass them through ffi to C function that only handle pointer as data.
 That's where this crate comes in!
 
-### Light references
+### Thin references
 
 This crates allows to easily opt in to light references to trait for a type, by having
 pointers to the virtual table within the object.
@@ -70,17 +70,17 @@ struct Circle { r: f32 }
 impl Shape for Circle { fn area(&self) -> f32 { 3.14 * self.r * self.r } }
 
 // Given an array of Shape, compute the sum of their area
-fn total_area(list: &[LightRef<dyn Shape>]) -> f32 {
+fn total_area(list: &[ThinRef<dyn Shape>]) -> f32 {
     list.iter().map(|x| x.area()).fold(0., |a, b| a+b)
 }
 ```
 
-Same as before, but we added `#[vptr(Shape)]` and are now using `LightRef<Shape>` instead of
-`&dyn Shame`.  The difference is that the LightRef has only the size of one pointer
+Same as before, but we added `#[vptr(Shape)]` and are now using `ThinRef<Shape>` instead of
+`&dyn Shame`.  The difference is that the ThinRef has only the size of one pointer
 
 
 ```ascii
- LightRef<Shape>       Rectangle          ╭─>VTableData  ╭─>vtable of Shape for Rectangle
+ ThinRef<Shape>        Rectangle          ╭─>VTableData  ╭─>vtable of Shape for Rectangle
  ┏━━━━━━━━━━━━━┓      ┏━━━━━━━━━━━━┓ ╮    │  ┏━━━━━━━━┓  │     ┏━━━━━━━━━┓
  ┃ ptr         ┠──╮   ┃ w          ┃ │ ╭──│──┨ offset ┃  │     ┃ area()  ┃
  ┗━━━━━━━━━━━━━┛  │   ┣━━━━━━━━━━━━┫ ⎬─╯  │  ┣━━━━━━━━┫  │     ┣━━━━━━━━━┫
@@ -95,7 +95,7 @@ Same as before, but we added `#[vptr(Shape)]` and are now using `LightRef<Shape>
 
 The `#[vptr(Trait)]` macro can be applied to a struct and it adds members to the struct
 with pointer to the vtable, these members are of type VPtr<S, Trait>, where S is the struct.
-The macro also implements the `HasVPtr` trait which allow the creation of `LightRef` for this
+The macro also implements the `HasVPtr` trait which allow the creation of `ThinRef` for this
 
 You probably want to derive from `Default`, otherwise, the extra fields needs to be initialized
 manually (with `Default::default()` or `VPtr::new()`)
@@ -117,8 +117,8 @@ impl Display for Rectangle {
 // [...]
 let mut r1 = Rectangle::default();
 r1.w = 10.; r1.h = 5.;
-let ref1 = LightRef::<dyn Shape>::from(&r1);
-assert_eq!(mem::size_of::<LightRef<dyn Shape>>(), mem::size_of::<usize>());
+let ref1 = ThinRef::<dyn Shape>::from(&r1);
+assert_eq!(mem::size_of::<ThinRef<dyn Shape>>(), mem::size_of::<usize>());
 assert_eq!(ref1.area(), 50.);
 
 // When not initializing with default, you must initialize the vptr's manually
@@ -129,7 +129,7 @@ let r3 = Rectangle{ w: 1., h: 2., vptr_Shape: VPtr::new(), vptr_ToString: VPtr::
 #[vptr(Shape)] struct Point(u32, u32);
 impl Shape for Point { fn area(&self) -> f32 { 0. } }
 let p = Point(1, 2, VPtr::new());
-let pointref = LightRef::from(&p);
+let pointref = ThinRef::from(&p);
 assert_eq!(pointref.area(), 0.);
 ```
 
