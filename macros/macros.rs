@@ -23,7 +23,7 @@ extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::Parser;
-use syn::{self, spanned::Spanned, AttributeArgs, Ident, ItemStruct};
+use syn::{self, spanned::Spanned, AttributeArgs, ItemStruct};
 
 /// Refer to the documentation of the `vptr` crate
 #[proc_macro_attribute]
@@ -80,7 +80,7 @@ fn vptr_impl(attr: AttributeArgs, item: ItemStruct) -> Result<TokenStream, syn::
         for (trait_, field_name) in &attr_with_names {
             n.named
                 .push(parser.parse(
-                    quote!(#field_name : vptr::VPtr<#ident #ty_generics, #trait_>).into(),
+                    quote!(#field_name : vptr::VPtr<#ident #ty_generics, dyn #trait_>).into(),
                 )?);
         }
         (syn::Fields::Named(n), attr_with_names)
@@ -97,7 +97,7 @@ fn vptr_impl(attr: AttributeArgs, item: ItemStruct) -> Result<TokenStream, syn::
         let parser = syn::Field::parse_unnamed;
         for trait_ in &attr {
             n.unnamed
-                .push(parser.parse(quote!(vptr::VPtr<#ident #ty_generics, #trait_>).into())?);
+                .push(parser.parse(quote!(vptr::VPtr<#ident #ty_generics, dyn #trait_>).into())?);
         }
         let attr_with_names: Vec<_> = attr
             .iter()
@@ -111,12 +111,12 @@ fn vptr_impl(attr: AttributeArgs, item: ItemStruct) -> Result<TokenStream, syn::
     };
 
     let mut result = quote!(
-        #(#attrs)* #vis #struct_token #ident #generics  #fields  #semi_token
+        #(#attrs)* #[allow(non_snake_case)] #vis #struct_token #ident #generics  #fields  #semi_token
     );
 
     for (trait_, field_name) in attr_with_names {
         result = quote!(#result
-            unsafe impl #impl_generics vptr::HasVPtr<#trait_> for #ident #ty_generics #where_clause {
+            unsafe impl #impl_generics vptr::HasVPtr<dyn #trait_> for #ident #ty_generics #where_clause {
                 fn init() -> &'static VTableData {
                     use vptr::internal::{TransmuterTO, TransmuterPtr};
                     static VTABLE : VTableData = VTableData{
@@ -126,14 +126,14 @@ fn vptr_impl(attr: AttributeArgs, item: ItemStruct) -> Result<TokenStream, syn::
                         },
                         vtable: unsafe {
                             let x: &'static #ident  = TransmuterPtr::<#ident> { int: 0 }.ptr;
-                            TransmuterTO::<#trait_>{ ptr: x }.to.vtable
+                            TransmuterTO::<dyn #trait_>{ ptr: x }.to.vtable
                         }
                     };
                     &VTABLE
                 }
 
-                fn get_vptr(&self) -> &VPtr<Self, #trait_> { &self.#field_name }
-                fn get_vptr_mut(&mut self) -> &mut VPtr<Self, #trait_> { &mut self.#field_name }
+                fn get_vptr(&self) -> &VPtr<Self, dyn #trait_> { &self.#field_name }
+                fn get_vptr_mut(&mut self) -> &mut VPtr<Self, dyn #trait_> { &mut self.#field_name }
             }
         );
     }

@@ -676,7 +676,7 @@ mod tests {
     #[test]
     fn with_path() {
         let x = TestDisplay{ str: "Hello".to_string(), vptr_Display: Default::default() };
-        let xx : LightRef<std::fmt::Display> = x.as_light_ref();
+        let xx : LightRef<dyn std::fmt::Display> = x.as_light_ref();
         assert_eq!(xx.to_string(), "Test Hello");
     }
 
