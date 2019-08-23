@@ -3,7 +3,7 @@
 
 # vptr
 
-Enable light references to trait
+Enable thin references to trait
 
 ## Intro
 
@@ -60,7 +60,7 @@ That's where this crate comes in!
 
 ### Thin references
 
-This crates allows to easily opt in to light references to trait for a type, by having
+This crates allows to easily opt in to thin references to trait for a type, by having
 pointers to the virtual table within the object.
 
 ```rust

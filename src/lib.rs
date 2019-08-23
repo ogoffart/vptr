@@ -16,7 +16,7 @@ OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-/*! Enable light references to trait
+/*! Enable thin references to trait
 
 # Intro
 
@@ -73,7 +73,7 @@ That's where this crate comes in!
 
 ## Thin references
 
-This crates allows to easily opt in to light references to trait for a type, by having
+This crates allows to easily opt in to thin references to trait for a type, by having
 pointers to the virtual table within the object.
 
 ```rust
@@ -233,16 +233,16 @@ pub unsafe trait HasVPtr<Trait: ?Sized> {
     where
         Self: Sized;
 
-    /// return a light reference to self
-    fn as_light_ref(&self) -> ThinRef<Trait>
+    /// return a thin reference to self
+    fn as_thin_ref(&self) -> ThinRef<Trait>
     where
         Self: Sized,
     {
         unsafe { ThinRef::new(self.get_vptr()) }
     }
 
-    /// return a light reference to self
-    fn as_light_ref_mut(&mut self) -> ThinRefMut<Trait>
+    /// return a thin reference to self
+    fn as_thin_ref_mut(&mut self) -> ThinRefMut<Trait>
     where
         Self: Sized,
     {
@@ -250,7 +250,7 @@ pub unsafe trait HasVPtr<Trait: ?Sized> {
     }
 }
 
-/// A light reference (size = `size_of::<usize>()`) to an object implementing the trait `Trait`
+/// A thin reference (size = `size_of::<usize>()`) to an object implementing the trait `Trait`
 ///
 /// This is like a reference to a trait (`&dyn Trait`) for struct that used
 /// the macro `#[vptr(Trait)]`
@@ -310,7 +310,7 @@ impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a T> for ThinRef<'a, Trai
     }
 }
 
-/// A light reference (size = `size_of::<usize>()`) to an object implementing the trait `Trait`
+/// A thin reference (size = `size_of::<usize>()`) to an object implementing the trait `Trait`
 ///
 /// Same as ThinRef but for mutable references
 #[derive(Eq, PartialEq)]
@@ -396,8 +396,8 @@ impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a mut T> for ThinRefMut<'
 /// impl Shape for Rectangle { fn area(&self) -> f32 { self.w * self.h } }
 ///
 /// let r = Box::new(Rectangle { w: 5., h: 10., ..Default::default() });
-/// let light = ThinBox::from_box(r);
-/// assert_eq!(light.area(), 50.);
+/// let thin = ThinBox::from_box(r);
+/// assert_eq!(thin.area(), 50.);
 /// ```
 ///
 /// The size is the size of a pointer
@@ -424,13 +424,13 @@ impl<Trait: ?Sized + 'static> ThinBox<Trait> {
     }
     /// Conver the ThinBox into a Box
     pub fn into_box(mut b: ThinBox<Trait>) -> Box<Trait> {
-        let ptr = (&mut *ThinBox::as_light_ref_mut(&mut b)) as *mut Trait;
+        let ptr = (&mut *ThinBox::as_thin_ref_mut(&mut b)) as *mut Trait;
         core::mem::forget(b);
         unsafe { Box::from_raw(ptr) }
     }
 
     /// As a ThinRef
-    pub fn as_light_ref(b: &ThinBox<Trait>) -> ThinRef<Trait> {
+    pub fn as_thin_ref(b: &ThinBox<Trait>) -> ThinRef<Trait> {
         ThinRef {
             ptr: unsafe { b.0.as_ref() },
             phantom: PhantomData,
@@ -438,7 +438,7 @@ impl<Trait: ?Sized + 'static> ThinBox<Trait> {
     }
 
     /// As a ThinRefMut
-    pub fn as_light_ref_mut(b: &mut ThinBox<Trait>) -> ThinRefMut<Trait> {
+    pub fn as_thin_ref_mut(b: &mut ThinBox<Trait>) -> ThinRefMut<Trait> {
         ThinRefMut {
             ptr: unsafe { b.0.as_mut() },
             phantom: PhantomData,
@@ -449,7 +449,7 @@ impl<Trait: ?Sized + 'static> ThinBox<Trait> {
 #[cfg(feature = "std")]
 impl<Trait: ?Sized + 'static> Drop for ThinBox<Trait> {
     fn drop(&mut self) {
-        let ptr = &mut *ThinBox::as_light_ref_mut(self) as *mut Trait;
+        let ptr = &mut *ThinBox::as_thin_ref_mut(self) as *mut Trait;
         unsafe { Box::from_raw(ptr) };
     }
 }
@@ -459,7 +459,7 @@ impl<Trait: ?Sized + 'static> Deref for ThinBox<Trait> {
     type Target = Trait;
 
     fn deref(&self) -> &Self::Target {
-        let ptr = &*ThinBox::as_light_ref(self) as *const Trait;
+        let ptr = &*ThinBox::as_thin_ref(self) as *const Trait;
         unsafe { &*ptr }
     }
 }
@@ -467,7 +467,7 @@ impl<Trait: ?Sized + 'static> Deref for ThinBox<Trait> {
 #[cfg(feature = "std")]
 impl<Trait: ?Sized + 'static> DerefMut for ThinBox<Trait> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        let ptr = &mut *ThinBox::as_light_ref_mut(self) as *mut Trait;
+        let ptr = &mut *ThinBox::as_thin_ref_mut(self) as *mut Trait;
         unsafe { &mut *ptr }
     }
 }
@@ -543,7 +543,7 @@ mod tests {
         f.q = 5;
         assert_eq!(f.myfn(), 9);
 
-        let xx = f.as_light_ref();
+        let xx = f.as_thin_ref();
         assert_eq!(xx.myfn(), 9);
     }
 
@@ -570,12 +570,12 @@ mod tests {
         assert_eq!(f.myfn(), 9);
 
         {
-            let xx: ThinRef<dyn MyTrait> = f.as_light_ref();
+            let xx: ThinRef<dyn MyTrait> = f.as_thin_ref();
             assert_eq!(xx.myfn(), 9);
         }
 
         {
-            let xx: ThinRefMut<dyn MyTrait> = f.as_light_ref_mut();
+            let xx: ThinRefMut<dyn MyTrait> = f.as_thin_ref_mut();
             assert_eq!(xx.myfn(), 9);
         }
     }
@@ -599,7 +599,7 @@ mod tests {
         f.foo.push(3);
         assert_eq!(f.myfn(), 1);
 
-        let xx : ThinRef<dyn MyTrait> = f.as_light_ref();
+        let xx : ThinRef<dyn MyTrait> = f.as_thin_ref();
         assert_eq!(xx.myfn(), 9);
 
     }
@@ -624,7 +624,7 @@ mod tests {
         f.foo = Some(&x);
         assert_eq!(f.myfn(), 43);
 
-        let xx: ThinRef<dyn MyTrait> = f.as_light_ref();
+        let xx: ThinRef<dyn MyTrait> = f.as_thin_ref();
         assert_eq!(xx.myfn(), 43);
     }
 
@@ -641,7 +641,7 @@ mod tests {
         let f = Tuple(42, 43, Default::default());
         assert_eq!(f.myfn(), 43);
 
-        let xx: ThinRef<_> = f.as_light_ref();
+        let xx: ThinRef<_> = f.as_thin_ref();
         assert_eq!(xx.myfn(), 43);
     }
 
@@ -659,7 +659,7 @@ mod tests {
         let f = Empty1(VPtr::new());
         assert_eq!(f.myfn(), 88);
 
-        let xx: ThinRef<dyn MyTrait> = f.as_light_ref();
+        let xx: ThinRef<dyn MyTrait> = f.as_thin_ref();
         assert_eq!(xx.myfn(), 88);
     }
 
@@ -679,7 +679,7 @@ mod tests {
             str: "Hello".to_string(),
             vptr_Display: Default::default(),
         };
-        let xx: ThinRef<dyn std::fmt::Display> = x.as_light_ref();
+        let xx: ThinRef<dyn std::fmt::Display> = x.as_thin_ref();
         assert_eq!(xx.to_string(), "Test Hello");
     }
 
