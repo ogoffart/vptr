@@ -663,4 +663,21 @@ mod tests {
         assert_eq!(xx.myfn(), 88);
     }
 
+    #[vptr(std::fmt::Display)]
+    struct TestDisplay {
+        str: String,
+    }
+    impl std::fmt::Display for TestDisplay {
+        fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(fmt, "Test {}", self.str)
+        }
+    }
+
+    #[test]
+    fn with_path() {
+        let x = TestDisplay{ str: "Hello".to_string(), vptr_Display: Default::default() };
+        let xx : LightRef<std::fmt::Display> = x.as_light_ref();
+        assert_eq!(xx.to_string(), "Test Hello");
+    }
+
 }

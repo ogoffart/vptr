@@ -14,6 +14,6 @@ path = "macros.rs"
 proc-macro = true
 
 [dependencies]
-quote = "0.6.12"
-syn = {version = "0.15.34", features = ["full", "extra-traits"]}
+quote = "1"
+syn = {version = "1", features = ["full", "extra-traits"]}
 
