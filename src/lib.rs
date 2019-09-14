@@ -77,7 +77,7 @@ This crates allows to easily opt in to thin references to trait for a type, by h
 pointers to the virtual table within the object.
 
 ```rust
-# use vptr::*;
+use vptr::vptr;
 trait Shape { fn area(&self) -> f32; }
 #[vptr(Shape)]
 struct Rectangle { w: f32, h : f32 }
@@ -87,7 +87,7 @@ struct Circle { r: f32 }
 impl Shape for Circle { fn area(&self) -> f32 { 3.14 * self.r * self.r } }
 
 // Given an array of Shape, compute the sum of their area
-fn total_area(list: &[ThinRef<dyn Shape>]) -> f32 {
+fn total_area(list: &[vptr::ThinRef<dyn Shape>]) -> f32 {
     list.iter().map(|x| x.area()).fold(0., |a, b| a+b)
 }
 ```
@@ -150,6 +150,17 @@ impl Shape for Point { fn area(&self) -> f32 { 0. } }
 let p = Point(1, 2, VPtr::new());
 let pointref = ThinRef::from(&p);
 assert_eq!(pointref.area(), 0.);
+
+// The trait can be put in quote if it is too complex for a meta attribute
+#[vptr("PartialEq<str>")]
+#[derive(Default)]
+struct MyString(String);
+impl PartialEq<str> for MyString {
+    fn eq(&self, other: &str) -> bool { self.0 == other }
+}
+let mystr = MyString("Hi".to_string(), VPtr::new());
+let mystring_ref = ThinRef::from(&mystr);
+assert!(*mystring_ref == *"Hi");
 ```
 */
 
@@ -486,7 +497,7 @@ pub struct VTableData {
 }
 unsafe impl core::marker::Sync for VTableData {}
 
-/// A convenience tmodule import the most important items
+/// A convenience module import the most important items
 ///
 /// ```
 /// use vptr::prelude::*;
@@ -525,7 +536,7 @@ pub mod internal {
 
 #[cfg(test)]
 mod tests {
-    pub use crate::{vptr, ThinRef, ThinRefMut, ThinBox, VPtr, HasVPtr};
+    pub use crate::{vptr, HasVPtr, ThinBox, ThinRef, ThinRefMut, VPtr};
 
     mod vptr {
         // Because otherwise, the generated code cannot access the vptr crate.
