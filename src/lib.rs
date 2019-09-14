@@ -683,4 +683,28 @@ mod tests {
         assert_eq!(xx.to_string(), "Test Hello");
     }
 
+    #[test]
+    fn test_trait_with_gen() {
+        trait TraitWithGen<T> {
+            fn compute(&self, x: T) -> u32;
+        }
+        #[vptr("TraitWithGen<u64>")]
+        struct TestTraitWithGen {
+            value: u32,
+        }
+        impl TraitWithGen<u64> for TestTraitWithGen {
+            fn compute(&self, x: u64) -> u32 {
+                self.value + (x as u32)
+            }
+        }
+
+        let x = TestTraitWithGen {
+            value: 44,
+            vptr_TraitWithGen: Default::default(),
+        };
+        let xx: ThinRef<dyn TraitWithGen<u64>> = x.as_thin_ref();
+        assert_eq!(core::mem::size_of_val(&xx), core::mem::size_of::<usize>());
+        assert_eq!(xx.compute(66u64), 44 + 66);
+    }
+
 }

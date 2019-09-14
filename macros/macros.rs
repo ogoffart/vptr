@@ -51,7 +51,9 @@ fn vptr_impl(attr: AttributeArgs, item: ItemStruct) -> Result<TokenStream, syn::
         .iter()
         .map(|a| {
             if let syn::NestedMeta::Meta(syn::Meta::Path(i)) = a {
-                Ok(i)
+                Ok(i.clone())
+            } else if let syn::NestedMeta::Lit(syn::Lit::Str(lit_str)) = a {
+                lit_str.parse::<syn::Path>()
             } else {
                 Err(syn::Error::new(
                     a.span(),
@@ -71,7 +73,6 @@ fn vptr_impl(attr: AttributeArgs, item: ItemStruct) -> Result<TokenStream, syn::
         let attr_with_names: Vec<_> = attr
             .iter()
             .map(|t| {
-                //let field_name = quote::format_ident!("vptr_{}", t.segments.iter().map(|p| p.ident.unraw().to_string()).collect::<Vec<_>>().join("__"));
                 let field_name = quote::format_ident!("vptr_{}", t.segments.last().unwrap().ident);
                 (t, quote! { #field_name })
             })
