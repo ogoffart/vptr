@@ -171,6 +171,7 @@ pub use ::vptr_macros::vptr;
 use core::borrow::{Borrow, BorrowMut};
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
+use core::pin::Pin;
 use core::ptr::NonNull;
 #[cfg(feature = "std")]
 use std::boxed::Box;
@@ -259,6 +260,22 @@ pub unsafe trait HasVPtr<Trait: ?Sized> {
         Self: Sized,
     {
         unsafe { ThinRefMut::new(self.get_vptr_mut()) }
+    }
+
+    /// Map a pinned reference to to a pinned thin reference
+    fn as_pin_thin_ref(self: Pin<&Self>) -> Pin<ThinRef<Trait>>
+    where
+        Self: Sized,
+    {
+        unsafe { Pin::new_unchecked(self.get_ref().as_thin_ref()) }
+    }
+
+    /// Map a pinned mutable reference to to a pinned mutable thin reference
+    fn as_pin_thin_ref_mut(self: Pin<&mut Self>) -> Pin<ThinRefMut<Trait>>
+    where
+        Self: Sized,
+    {
+        unsafe { Pin::new_unchecked(self.get_unchecked_mut().as_thin_ref_mut()) }
     }
 }
 
@@ -742,6 +759,26 @@ mod tests {
         let xx2 = xx;
         assert_eq!(xx.myfn(), 3);
         assert_eq!(xx2.myfn(), 3);
+    }
+
+    #[test]
+    fn pin() {
+        use core::pin::Pin;
+        {
+            let mut f = Foobar3::default();
+            f.q = 5;
+            let f: Pin<&Foobar3> = unsafe { Pin::new_unchecked(&f) };
+            let xx: Pin<ThinRef<dyn MyTrait>> = f.as_pin_thin_ref();
+            assert_eq!(xx.myfn(), 9);
+        }
+
+        {
+            let mut f = Foobar3::default();
+            f.q = 8;
+            let f: Pin<&mut Foobar3> = unsafe { Pin::new_unchecked(&mut f) };
+            let xx: Pin<ThinRefMut<dyn MyTrait>> = f.as_pin_thin_ref_mut();
+            assert_eq!(xx.myfn(), 12);
+        }
     }
 
 }
