@@ -277,7 +277,6 @@ pub unsafe trait HasVPtr<Trait: ?Sized> {
 /// assert_eq!(mem::size_of::<ThinRef<dyn Trait>>(), mem::size_of::<usize>());
 /// assert_eq!(mem::size_of::<Option<ThinRef<dyn Trait>>>(), mem::size_of::<usize>());
 /// ```
-#[derive(Copy, Clone, Eq, PartialEq)]
 pub struct ThinRef<'a, Trait: ?Sized> {
     ptr: &'a &'static VTableData,
     phantom: PhantomData<&'a Trait>,
@@ -322,10 +321,17 @@ impl<'a, Trait: ?Sized + 'a, T: HasVPtr<Trait>> From<&'a T> for ThinRef<'a, Trai
     }
 }
 
+// Cannot use #[derive()] because it gets the bounds wrong (See rust RFC #2353)
+impl<'a, Trait: ?Sized> Clone for ThinRef<'a, Trait> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<'a, Trait: ?Sized> Copy for ThinRef<'a, Trait> {}
+
 /// A thin reference (size = `size_of::<usize>()`) to an object implementing the trait `Trait`
 ///
 /// Same as ThinRef but for mutable references
-#[derive(Eq, PartialEq)]
 pub struct ThinRefMut<'a, Trait: ?Sized> {
     ptr: &'a mut &'static VTableData,
     phantom: PhantomData<&'a mut Trait>,
@@ -727,6 +733,15 @@ mod tests {
         let xx: ThinRef<dyn TraitWithGen<u64>> = x.as_thin_ref();
         assert_eq!(core::mem::size_of_val(&xx), core::mem::size_of::<usize>());
         assert_eq!(xx.compute(66u64), 44 + 66);
+    }
+
+    #[test]
+    fn copy() {
+        let f = Tuple(2, 3, Default::default());
+        let xx: ThinRef<_> = f.as_thin_ref();
+        let xx2 = xx;
+        assert_eq!(xx.myfn(), 3);
+        assert_eq!(xx2.myfn(), 3);
     }
 
 }
