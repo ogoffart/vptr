@@ -17,7 +17,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #![recursion_limit = "128"]
-//! Refer to the documentation of the `vptr` crate
+//! Refer to the [documentation of the `vptr` crate](../vptr/index.html#the-vptr-macro)
 
 extern crate proc_macro;
 use proc_macro::TokenStream;
@@ -25,7 +25,7 @@ use quote::quote;
 use syn::parse::Parser;
 use syn::{self, spanned::Spanned, AttributeArgs, ItemStruct};
 
-/// Refer to the documentation of the `vptr` crate
+/// Refer to the [documentation of the `vptr` crate](../vptr/index.html#the-vptr-macro)
 #[proc_macro_attribute]
 pub fn vptr(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr = syn::parse_macro_input!(attr as AttributeArgs);
@@ -118,9 +118,9 @@ fn vptr_impl(attr: AttributeArgs, item: ItemStruct) -> Result<TokenStream, syn::
     for (trait_, field_name) in attr_with_names {
         result = quote!(#result
             unsafe impl #impl_generics vptr::HasVPtr<dyn #trait_> for #ident #ty_generics #where_clause {
-                fn init() -> &'static VTableData {
+                fn init() -> &'static vptr::VTableData {
                     use vptr::internal::{TransmuterTO, TransmuterPtr};
-                    static VTABLE : VTableData = VTableData{
+                    static VTABLE : vptr::VTableData = vptr::VTableData{
                         offset: unsafe {
                             let x: &'static #ident  = TransmuterPtr { int: 0 }.ptr;
                             TransmuterPtr { ptr: &x.#field_name }.int
@@ -133,8 +133,8 @@ fn vptr_impl(attr: AttributeArgs, item: ItemStruct) -> Result<TokenStream, syn::
                     &VTABLE
                 }
 
-                fn get_vptr(&self) -> &VPtr<Self, dyn #trait_> { &self.#field_name }
-                fn get_vptr_mut(&mut self) -> &mut VPtr<Self, dyn #trait_> { &mut self.#field_name }
+                fn get_vptr(&self) -> &vptr::VPtr<Self, dyn #trait_> { &self.#field_name }
+                fn get_vptr_mut(&mut self) -> &mut vptr::VPtr<Self, dyn #trait_> { &mut self.#field_name }
             }
         );
     }

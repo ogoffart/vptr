@@ -155,6 +155,7 @@ assert_eq!(pointref.area(), 0.);
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![warn(missing_docs)]
+#[doc(inline)]
 pub use ::vptr_macros::vptr;
 use core::borrow::{Borrow, BorrowMut};
 use core::marker::PhantomData;
@@ -485,6 +486,16 @@ pub struct VTableData {
 }
 unsafe impl core::marker::Sync for VTableData {}
 
+/// A convenience tmodule import the most important items
+///
+/// ```
+/// use vptr::prelude::*;
+/// ```
+pub mod prelude {
+    #[doc(no_inline)]
+    pub use crate::{vptr, HasVPtr};
+}
+
 #[doc(hidden)]
 pub mod internal {
     /// Internal struct used by the macro generated code
@@ -514,11 +525,11 @@ pub mod internal {
 
 #[cfg(test)]
 mod tests {
-    pub use super::*;
+    pub use crate::{vptr, ThinRef, ThinRefMut, ThinBox, VPtr, HasVPtr};
 
     mod vptr {
         // Because otherwise, the generated code cannot access the vptr crate.
-        pub use super::*;
+        pub use crate::*;
     }
 
     trait MyTrait {
