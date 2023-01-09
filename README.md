@@ -80,7 +80,7 @@ fn total_area(list: &[vptr::ThinRef<dyn Shape>]) -> f32 {
 ```
 
 Same as before, but we added `#[vptr(Shape)]` and are now using `ThinRef<Shape>` instead of
-`&dyn Shame`.  The difference is that the ThinRef has only the size of one pointer
+`&dyn Shape`.  The difference is that the ThinRef has only the size of one pointer
 
 
 ```ascii
