@@ -1,6 +1,6 @@
 [package]
 name = "vptr"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Olivier Goffart <ogoffart@woboq.com>"]
 edition = "2021"
 description = "Thin references to trait objects by embedding the virtual table pointer in the struct"
@@ -17,4 +17,4 @@ default = ["std"]
 std = []
 
 [dependencies]
-vptr-macros = {path = "./macros", version = "=0.2.1"}
+vptr-macros = {path = "./macros", version = "=0.2.2"}

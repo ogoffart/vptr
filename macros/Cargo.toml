@@ -1,9 +1,9 @@
 [package]
 name = "vptr-macros"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Olivier Goffart <ogoffart@woboq.com>"]
 description = "Procedural macros for the `vptr` crate"
-edition = "2018"
+edition = "2021"
 license = "MIT"
 repository = "https://github.com/ogoffart/vptr"
 documentation = "https://docs.rs/vptr"
