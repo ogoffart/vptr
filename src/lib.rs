@@ -215,12 +215,11 @@ where
     }
 }
 
-#[cfg(feature = "std")]
-impl<T, Trait: ?Sized> std::fmt::Debug for VPtr<T, Trait>
+impl<T, Trait: ?Sized> core::fmt::Debug for VPtr<T, Trait>
 where
     T: HasVPtr<Trait>,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         f.pad("VPtr")
     }
 }
@@ -485,7 +484,7 @@ impl<Trait: ?Sized + 'static> ThinBox<Trait> {
 impl<Trait: ?Sized + 'static> Drop for ThinBox<Trait> {
     fn drop(&mut self) {
         let ptr = &mut *ThinBox::as_thin_ref_mut(self) as *mut Trait;
-        unsafe { Box::from_raw(ptr) };
+        drop(unsafe { Box::from_raw(ptr) });
     }
 }
 
@@ -559,8 +558,11 @@ pub mod internal {
 
 #[cfg(test)]
 mod tests {
-    pub use crate::{vptr, HasVPtr, ThinBox, ThinRef, ThinRefMut, VPtr};
-
+    #[cfg(not(feature = "std"))]
+    extern crate alloc;
+    use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::{String, ToString as _};
     mod vptr {
         // Because otherwise, the generated code cannot access the vptr crate.
         pub use crate::*;
@@ -611,7 +613,6 @@ mod tests {
     fn it_works3() {
         let mut f = Foobar3::default();
         f.q = 5;
-        println!("{:?}", f);
         assert_eq!(f.myfn(), 9);
 
         {
@@ -674,6 +675,7 @@ mod tests {
     }
 
     #[vptr(MyTrait)]
+    #[allow(unused)]
     struct Tuple(u32, u32);
 
     impl MyTrait for Tuple {
@@ -708,12 +710,12 @@ mod tests {
         assert_eq!(xx.myfn(), 88);
     }
 
-    #[vptr(std::fmt::Display)]
+    #[vptr(core::fmt::Display)]
     struct TestDisplay {
         str: String,
     }
-    impl std::fmt::Display for TestDisplay {
-        fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    impl core::fmt::Display for TestDisplay {
+        fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             write!(fmt, "Test {}", self.str)
         }
     }
@@ -724,7 +726,7 @@ mod tests {
             str: "Hello".to_string(),
             vptr_Display: Default::default(),
         };
-        let xx: ThinRef<dyn std::fmt::Display> = x.as_thin_ref();
+        let xx: ThinRef<dyn core::fmt::Display> = x.as_thin_ref();
         assert_eq!(xx.to_string(), "Test Hello");
     }
 
@@ -780,5 +782,4 @@ mod tests {
             assert_eq!(xx.myfn(), 12);
         }
     }
-
 }

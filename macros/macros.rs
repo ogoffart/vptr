@@ -121,10 +121,7 @@ fn vptr_impl(attr: AttributeArgs, item: ItemStruct) -> Result<TokenStream, syn::
                 fn init() -> &'static vptr::VTableData {
                     use vptr::internal::{TransmuterTO, TransmuterPtr};
                     static VTABLE : vptr::VTableData = vptr::VTableData{
-                        offset: unsafe {
-                            let x: &'static #ident  = TransmuterPtr { int: 0 }.ptr;
-                            TransmuterPtr { ptr: &x.#field_name }.int
-                        },
+                        offset: ::core::mem::offset_of!(#ident, #field_name) as isize,
                         vtable: unsafe {
                             let x: &'static #ident  = TransmuterPtr::<#ident> { int: 0 }.ptr;
                             TransmuterTO::<dyn #trait_>{ ptr: x }.to.vtable
